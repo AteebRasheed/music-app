@@ -39,6 +39,14 @@ const WithdrawalSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
+    network: {
+        type: String,
+        default: null,
+    },
+    wallet: {
+        type: String,
+        default: null,
+    },
     status: {
         type: String,
         enum: ['Pending', 'Processed', 'Rejected'],

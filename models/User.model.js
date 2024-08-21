@@ -40,6 +40,18 @@ const UserSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    prevBalance: {
+        type: Number,
+        default: 0,
+    },
+    network: {
+        type: String,
+        default: null,
+    },
+    wallet: {
+        type: String,
+        default: null,
+    },
     sequenceId: Number,
     code: String,
     fixedTask: Number,

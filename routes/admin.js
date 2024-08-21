@@ -405,6 +405,8 @@ router.put('/user/updateAmount', async (req, res) => {
             for (const record of pendingRecords) {
                 // Add profit to the user's balance
                 user.balance += record.profit;
+                user.balance += user.prevBalance;
+                user.todayProfit = 0;
 
                 // Update the record status
                 await UserRecord.updateOne(

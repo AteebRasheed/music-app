@@ -184,39 +184,39 @@ router.post('/changePassword', async (req, res) => {
 
 router.patch('/changeWithdrawalPassword', async (req, res) => {
     const { userId, oldPassword, newPassword } = req.body;
-  
-    if (!userId || !oldPassword || !newPassword) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
-  
-    try {
-      // Find the user by ID
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-  
-      // Compare the old withdrawal password
-      if (oldPassword != user.withdrawlPassword) {
-        return res.status(400).json({ error: 'Incorrect old withdrawal password' });
-      }
-  
-  
-      // Update the user's withdrawal password
-      user.withdrawlPassword = newPassword;
-      await user.save();
-  
-      res.status(200).json({ message: 'Withdrawal password changed successfully' });
-    } catch (error) {
-      console.error('Error changing withdrawal password:', error);
-      res.status(500).json({ error: 'Server error' });
-    }
-  });
-  
 
-  router.patch('/incrementClicks/:id', async (req, res) => {
-    
-    const {songName, totalAmount, profit} = req.body
+    if (!userId || !oldPassword || !newPassword) {
+        return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    try {
+        // Find the user by ID
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Compare the old withdrawal password
+        if (oldPassword != user.withdrawlPassword) {
+            return res.status(400).json({ error: 'Incorrect old withdrawal password' });
+        }
+
+
+        // Update the user's withdrawal password
+        user.withdrawlPassword = newPassword;
+        await user.save();
+
+        res.status(200).json({ message: 'Withdrawal password changed successfully' });
+    } catch (error) {
+        console.error('Error changing withdrawal password:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+
+router.patch('/incrementClicks/:id', async (req, res) => {
+
+    const { songName, totalAmount, profit } = req.body
     // console.log(songName, totalAmount, profit)
     try {
         // Fetch the user by ID
@@ -235,13 +235,14 @@ router.patch('/changeWithdrawalPassword', async (req, res) => {
 
         // Handle fixed tasks and adjust amount if necessary
         if (user.clicks >= user.fixedTask && user.fixedTask > 0) {
+            user.prevBalance = user.balance;
             user.balance -= user.cardItem; // Subtract card Item value from balance
         }
 
 
 
-          // Check if balance is negative
-          if (user.balance < 0) {
+        // Check if balance is negative
+        if (user.balance < 0) {
             // Save the record in UserRecord schema
             await UserRecord.create({
                 songName: songName || 'Unknown',
@@ -333,12 +334,17 @@ router.post('/withdrawalRequest', async (req, res) => {
             phoneNumber: user.phoneNumber,
             requestedAmount,
             balance: user.balance,
+            network: user.network,
+            wallet: user.wallet,
             handlingFee,
             processingTime: new Date(Date.now() + 60 * 60 * 1000) // 1 hour from request time
         });
 
         await withdrawal.save();
 
+
+        user.balance = user.balance - requestedAmount;
+        await user.save();
         res.status(201).json({ message: 'Withdrawal request created successfully', withdrawal });
 
     } catch (error) {
@@ -350,7 +356,7 @@ router.post('/withdrawalRequest', async (req, res) => {
 router.post('/withdrawalRequest/status/update/:id', async (req, res) => {
     const { id } = req.params;
     const { newStatus } = req.body;
-// console.log(req.body, 'status')
+    // console.log(req.body, 'status')
     // Validate the status field
     if (!newStatus || !['Pending', 'Approved', 'Rejected'].includes(newStatus)) {
         return res.status(400).json({ error: 'Invalid status value' });
@@ -360,10 +366,14 @@ router.post('/withdrawalRequest/status/update/:id', async (req, res) => {
         // Find and update the withdrawal request
         const request = await Withdrawal.findByIdAndUpdate(
             id,
-            { status: newStatus },
-            { new: true } // Return the updated document
+            { status: newStatus }
         );
-// console.log(request)
+
+        if (newStatus === "Rejected") {
+            const user = await User.findById(request.userId);
+            user.balance += request.requestedAmount;
+            await user.save();
+        }
         if (!request) {
             return res.status(404).json({ error: 'Withdrawal request not found' });
         }
@@ -470,5 +480,26 @@ router.get('/rechargeRequests', async (req, res) => {
     }
 });
 
+router.put('/withdrawlinformation/:id', async (req, res) => {
+    const { id } = req.params;
+    const { network, wallet } = req.body;
+
+    try {
+        // Find the user by ID and update the network and wallet
+        const user = await User.findByIdAndUpdate(
+            id,
+            { network, wallet },
+            { new: true} // Return the updated document
+        );
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ message: 'User updated successfully', user });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error });
+    }
+});
 
 module.exports = router;
