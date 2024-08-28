@@ -21,7 +21,7 @@ router.post('/create', async (req, res) => {
         }
 
         // Check if the username or email already exists
-        
+
         const existingUser = await AdminUser.findOne({ $or: [{ username }, { email }] });
         if (existingUser) {
             return res.status(400).json({ error: 'Username or email already exists' });
@@ -351,7 +351,7 @@ router.put('/user/cardOrder', async (req, res) => {
         if (comissionRatio !== undefined) user.commission = comissionRatio;
         if (cardOne !== undefined) user.cardItem = cardOne;
         if (singleCardOne !== undefined) user.fixedTask = singleCardOne;
-        if (cardName !== undefined ) user.cardName = cardName;
+        if (cardName !== undefined) user.cardName = cardName;
 
         // Save the updated user
         await user.save();
@@ -369,53 +369,69 @@ router.put('/user/cardOrder', async (req, res) => {
 // user recharge or deduction 
 router.put('/user/updateAmount', async (req, res) => {
     const { username, changeAmount, changeType } = req.body;
-
+    // console.log(changeAmount)
     // Validate input
     if (!username || changeAmount === undefined || !changeType) {
         return res.status(400).json({ message: 'Username, change value, and option are required.' });
     }
 
     try {
-        // Determine increment or decrement value
-        const incrementValue = changeType === 'userrecharge' ? changeAmount : -changeAmount;
-
-        // Find and update the user balance
-        const user = await User.findOneAndUpdate(
-            { username },
-            { $inc: { balance: incrementValue } },
-            { new: true } // Return the updated document
-        );
+        let user = await User.findOne({ username });
 
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        // If balance goes from negative to positive, handle pending records
-        if (user.balance > 0 && changeType === 'userrecharge') {
-            // Update additional fields if needed
-            await User.updateOne(
-                { username },
-                { $set: { cardOrder: 0, fixedTask: 0 } }
-            );
+        if (changeType === 'userrecharge') {
+            // Check if the balance is negative
+            if (user.balance < 0) {
+                // Calculate the new balance
+                // console.log(changeAmount)
+                user.balance = user.prevBalance + parseFloat(changeAmount);
 
-            // Fetch pending records
-            const pendingRecords = await UserRecord.find({ userID: user._id, status: 'pending' });
+                // Fetch pending records
+                const pendingRecords = await UserRecord.find({ userID: user._id, status: 'pending' });
 
-            // Process each pending record
-            for (const record of pendingRecords) {
-                // Add profit to the user's balance
-                user.balance += record.profit;
-                user.balance += user.prevBalance;
+                let totalProfit = 0;
+                // Add profit from pending records to the balance
+                for (const record of pendingRecords) {
+                    totalProfit += record.profit;
+
+                    // Update the record status to 'completed'
+                    await UserRecord.updateOne(
+                        { _id: record._id },
+                        { $set: { status: 'completed' } }
+                    );
+                }
+
+                // Update the user's balance with the profit from pending records
+                user.balance += totalProfit;
+
+                // Round the balance to 2 decimal places
+                user.balance = Math.round(user.balance * 100) / 100;
+
+                // Clear specific fields
+                user.cardItem = 0;
+                user.fixedTask = 0;
                 user.todayProfit = 0;
-
-                // Update the record status
-                await UserRecord.updateOne(
-                    { _id: record._id },
-                    { $set: { status: 'completed' } }
-                );
+                // console.log(user.balance, "balance < 0")
+                // Save the updated user document
+                await user.save();
+            } else {
+                // If the balance is not negative, just increment the balance with changeAmount
+                user.balance = user.balance + parseFloat(changeAmount);
+                user.balance = Math.round(user.balance * 100) / 100;
+                // console.log(user.balance, "balance > 0")
+                await user.save();
             }
+        } else {
+            // For non-'userrecharge' types, update the balance by subtracting the changeAmount
+            const incrementValue = -changeAmount;
+            user.balance += incrementValue;
 
-            // Save the updated user document
+            // Round the balance to 2 decimal places
+            user.balance = Math.round(user.balance * 100) / 100;
+            // console.log(user.balance, "else")
             await user.save();
         }
 

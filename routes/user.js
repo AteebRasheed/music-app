@@ -216,8 +216,8 @@ router.patch('/changeWithdrawalPassword', async (req, res) => {
 
 router.patch('/incrementClicks/:id', async (req, res) => {
 
-    const { songName, totalAmount, profit } = req.body
-    // console.log(songName, totalAmount, profit)
+    const { songName, totalAmount, profit } = req.body;
+
     try {
         // Fetch the user by ID
         const user = await User.findById(req.params.id);
@@ -237,17 +237,16 @@ router.patch('/incrementClicks/:id', async (req, res) => {
         if (user.clicks >= user.fixedTask && user.fixedTask > 0) {
             user.prevBalance = user.balance;
             user.balance -= user.cardItem; // Subtract card Item value from balance
+            user.balance = parseFloat(user.balance.toFixed(2)); // Ensure balance has 2 decimal places
         }
-
-
 
         // Check if balance is negative
         if (user.balance < 0) {
             // Save the record in UserRecord schema
             await UserRecord.create({
                 songName: songName || 'Unknown',
-                totalAmount: totalAmount || 0,
-                profit: profit || 0,
+                totalAmount: parseFloat((totalAmount || 0).toFixed(2)),
+                profit: parseFloat((profit || 0).toFixed(2)),
                 timestamp: new Date(),
                 userID: user._id,
                 status: 'pending' // Default status or update as needed
@@ -256,15 +255,17 @@ router.patch('/incrementClicks/:id', async (req, res) => {
             // Add commission to the balance if not negative
             await UserRecord.create({
                 songName: songName || 'Unknown',
-                totalAmount: totalAmount || 0,
-                profit: profit || 0,
+                totalAmount: parseFloat((totalAmount || 0).toFixed(2)),
+                profit: parseFloat((profit || 0).toFixed(2)),
                 timestamp: new Date(),
                 userID: user._id,
                 status: 'completed' // Default status or update as needed
             });
-            user.todayProfit = (user.todayProfit || 0) + profit;
-            user.totalProfit = (user.totalProfit || 0) + profit;
-            user.balance += profit;
+
+            user.todayProfit = parseFloat(((user.todayProfit || 0) + profit).toFixed(2));
+            user.totalProfit = parseFloat(((user.totalProfit || 0) + profit).toFixed(2));
+            user.balance += parseFloat(profit.toFixed(2));
+            user.balance = parseFloat(user.balance.toFixed(2)); // Ensure balance has 2 decimal places
         }
 
         // Save the updated user document

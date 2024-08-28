@@ -8,7 +8,7 @@ router.get('/user/records/:userID', async (req, res) => {
 
     try {
         // Fetch all records for the given userID
-        const records = await UserRecord.find({ userID });
+        const records = await UserRecord.find({ userID }).sort({ timestamp: -1 });
 
         if (!records) {
             return res.status(404).json({ message: 'No records found for this user.' });
